@@ -1,67 +1,63 @@
 const dynamoDb = require('../dynamoDb');
 const uuid = require('uuid');
+const { DynamoDBCustomizations } = require('aws-sdk/lib/services/dynamodb');
 require('dotenv').config();
 const app = require('express').Router();
 
 const TABLENAME = process.env.TABLENAME;
 
 
-// //put new product
-// app.post('/',async (req, res)=>{
-//     const id = uuid.v4();
-//     const params = {
-//         TableName : `${TABLENAME}`,
-//         Item: {
-//             'PK' : `PRODUCT#${id}`,
-//             'SK' : `PRODUCT`,
-//             'name' : `${req.body.name}`,
-//             'description' : `${req.body.description}`,
-//             'price' : `${req.body.price}`,
-//             'color' : `${req.body.color}`,
-//             'id' : `${id}`
-//         }
-//     };
-//     try{
-//         const data = await dynamoDb.put(params).promise();
-//         if(data)
-//             res.send("Product created successfully");    
-//     }catch (error) {
-//         console.log(error);
-//     }
-// });
-
-//put new product by update expression
-app.post('/', async(req,res) => {
+//put new product and increase product stat counter
+app.post('/',async(req,res)=>{
     const id = uuid.v4();
     const params = {
-        TableName: TABLENAME,
-        Key:{
-            PK: `PRODUCT#${id}`,
-            SK: `PRODUCT`
-        },
-        UpdateExpression: "set #color = :color, #price = :price, #name = :name, #description = :description, #id = :id, #invocation = invocation + 1",
-        ExpressionAttributeNames:{
-            "#color": "color",
-            "#price": "price",
-            "#name":"name",
-            "#description": "description",
-            "#id": "id",
-            "#invocation" : "invocation"
-        },
-        ExpressionAttributeValues:{
-            ':color' : `${req.body.color}`,
-            ':price' : `${req.body.price}`,
-            ':name' : `${req.body.name}`,
-            ':description' : `${req.body.description}`,
-            ':id' : `${id}`
-        },
-        ReturnValues : 'UPDATED_NEW'
+        TransactItems: [
+            {
+                Update: {
+                    TableName: TABLENAME,
+                    Key:{
+                        PK: `PRODUCT#${id}`,
+                        SK: `PRODUCT`
+                    },
+                    UpdateExpression: "set #color = :color, #price = :price, #name = :name, #description = :description, #id = :id",
+                    ExpressionAttributeNames:{
+                        "#color": "color",
+                        "#price": "price",
+                        "#name":"name",
+                        "#description": "description",
+                        "#id": "id",
+                    },
+                    ExpressionAttributeValues:{
+                        ':color' : `${req.body.color}`,
+                        ':price' : `${req.body.price}`,
+                        ':name' : `${req.body.name}`,
+                        ':description' : `${req.body.description}`,
+                        ':id' : `${id}`
+                    }
+                }
+            },
+            {
+                Update: {
+                    TableName: `${TABLENAME}`,
+                    Key:{
+                        PK: `STAT#PRODUCT`,
+                        SK: `STAT`
+                    },
+                    UpdateExpression:"set #count = #count + :p",
+                    ExpressionAttributeNames: {
+                        "#count" : "count"
+                    },
+                    ExpressionAttributeValues: {
+                        ':p' : 1
+                    }
+                }
+            }
+        ]
     };
     try {
-        const data = await dynamoDb.update(params).promise();
-        res.send(data.Attributes);
+        const data = await dynamoDb.transactWrite(params).promise();
+        res.send(data);
     } catch (error) {
-        console.log(error);
         res.send(error);
     }
 });
@@ -83,21 +79,43 @@ app.get('/:id', async(req,res)=>{
     }
 });
 
-//delete ProductById
-app.delete('/:id',async(req,res)=>{
+//delete product and decrease the counter
+app.delete('/:id', async (req,res)=>{
     const params = {
-        TableName: `${TABLENAME}`,
-        Key:{
-            PK: `PRODUCT#${req.params.id}`,
-            SK: `PRODUCT`
-        },
-        ReturnValues: 'ALL_OLD'
+        TransactItems: [
+            {
+               Delete: {
+                    TableName: `${TABLENAME}`,
+                    Key:{
+                        PK: `PRODUCT#${req.params.id}`,
+                        SK: `PRODUCT`
+                    }
+                }
+            },
+            {
+                Update: {
+                    TableName: `${TABLENAME}`,
+                    Key:{
+                        PK: `STAT#PRODUCT`,
+                        SK: `STAT`
+                    },
+                    UpdateExpression:"set #count = #count - :p",
+                    ExpressionAttributeNames: {
+                        "#count" : "count"
+                    },
+                    ExpressionAttributeValues: {
+                        ':p' : 1
+                    }
+                }
+            }
+        ]
     };
     try {
-        const data = await dynamoDb.delete(params).promise();
-        res.send(data);    
+        const data = await dynamoDb.transactWrite(params).promise();
+        res.send(data);
     } catch (error) {
         console.log(error);
+        res.send(error);
     }
 });
 
@@ -109,14 +127,13 @@ app.put('/:id',async(req, res)=>{
             PK: `PRODUCT#${req.params.id}`,
             SK: `PRODUCT`
         },
-        UpdateExpression: "set color = :color, price = :price, #name = :name, description = :description, invocation = invocation + :p",
+        UpdateExpression: "set color = :color, price = :price, #name = :name, description = :description",
         ExpressionAttributeNames:{"#name":"name"},
         ExpressionAttributeValues:{
             ':color' : `${req.body.color}`,
             ':price' : `${req.body.price}`,
             ':name' : `${req.body.name}`,
             ':description' : `${req.body.description}`,
-            ':p' : 1
         },
         ReturnValues : 'UPDATED_NEW'
     };

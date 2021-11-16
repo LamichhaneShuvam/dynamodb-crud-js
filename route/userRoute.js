@@ -22,81 +22,112 @@ app.get('/:id', async(req,res)=>{
     }
 });
 
-
-// //put the user
-// app.post('/',async (req, res)=>{
-//     const id = uuid.v4();
-//     const params = {
-//         TableName : `${TABLENAME}`,
-//         Item: {
-//             'PK' : `USER#${id}`,
-//             'SK' : `USER`,
-//             'name' : `${req.body.name}`,
-//             'email' : `${req.body.email}`,
-//             'phone' : `${req.body.phone}`,
-//             'id' : `${id}`
-//         },
-//         //ReturnValues: '' // any _NEW doesn't work...
-//     };
-//     try{
-//         const data = await dynamoDb.put(params).promise();
-//         if(data)
-//             res.send("user created successfully");    
-//     }catch (error) {
-//         console.log(error);
-//         res.send(error);
-//     }
-// });
-
-//same put user but update insted of put
-app.post('/',async(req,res)=>{
+//Inserting value and increasing the value of counter
+app.post('/', async (req,res)=>{
     const id = uuid();
     const params = {
-        TableName: `${TABLENAME}`,
-        Key:{
-            PK: `USER#${id}`,
-            SK: `USER`
-        },
-        UpdateExpression:"set #name = :name, #phone = :phone, #email = :email, #id = :id",
-        ExpressionAttributeNames: {
-            "#name" : "name",
-            "#phone":"phone",
-            "#email":"email",
-            "#id": "id"
-        },
-        ExpressionAttributeValues: {
-            ':name' : `${req.body.name}`,
-            ':phone' : `${req.body.phone}`,
-            ':email' : `${req.body.email}`,
-            ':id' : `${id}`
-        }, ReturnValues: "UPDATED_NEW"
+        TransactItems:[
+            {
+                Update: {
+                    TableName: `${TABLENAME}`,
+                    Key:{
+                        PK: `USER#${id}`,
+                        SK: `USER`
+                    },
+                    UpdateExpression:"set #name = :name, #phone = :phone, #email = :email, #id = :id",
+                    ExpressionAttributeNames: {
+                        "#name" : "name",
+                        "#phone":"phone",
+                        "#email":"email",
+                        "#id": "id"
+                    },
+                    ExpressionAttributeValues: {
+                        ':name' : `${req.body.name}`,
+                        ':phone' : `${req.body.phone}`,
+                        ':email' : `${req.body.email}`,
+                        ':id' : `${id}`
+                    }
+                }
+            },
+            {
+                Update: {
+                    TableName: `${TABLENAME}`,
+                    Key:{
+                        PK: `STAT#USER`,
+                        SK: `STAT`
+                    },
+                    UpdateExpression:"set #count = #count + :p",
+                    ExpressionAttributeNames: {
+                        "#count" : "count"
+                    },
+                    ExpressionAttributeValues: {
+                        ':p' : 1
+                    }
+                }
+            }
+        ]
+
     };
     try {
-        const data = await dynamoDb.update(params).promise();
-        res.send(data.Attributes);
+        const data = await dynamoDb.transactWrite(params).promise();
+        if(data){
+            const returnVal = {
+                PK: `USER#${id}`,
+                SK: `USER`,
+                name : `${req.body.name}`,
+                phone : `${req.body.phone}`,
+                email : `${req.body.email}`,
+                id : `${id}`
+            }
+            res.send(returnVal);
+        }
+
     } catch (error) {
         console.log(error);
         res.send(error);
+
     }
 });
 
-//delete user
-app.delete('/:id',async(req,res)=>{
+
+//delete transaction where stat count is decreased
+app.delete('/:id', async (req,res) => {
     const params = {
-        TableName: `${TABLENAME}`,
-        Key:{
-            PK: `USER#${req.params.id}`,
-            SK: `USER`
-        },
-        ReturnValues: 'ALL_OLD'
+        TransactItems: [
+            {
+               Delete: {
+                    TableName: `${TABLENAME}`,
+                    Key:{
+                        PK: `USER#${req.params.id}`,
+                        SK: `USER`
+                    }
+                }
+            },
+            {
+                Update: {
+                    TableName: `${TABLENAME}`,
+                    Key:{
+                        PK: `STAT#USER`,
+                        SK: `STAT`
+                    },
+                    UpdateExpression:"set #count = #count - :p",
+                    ExpressionAttributeNames: {
+                        "#count" : "count"
+                    },
+                    ExpressionAttributeValues: {
+                        ':p' : 1
+                    }
+                }
+            }
+        ]
     };
     try {
-        const data = await dynamoDb.delete(params).promise();
-        res.send(data);    
+        const data = await dynamoDb.transactWrite(params).promise();
+        res.send(data);
     } catch (error) {
-        console.log(error);
+        res.send(error);
     }
-});
+})
 
 //update user
 app.put('/:id',async(req, res)=>{
