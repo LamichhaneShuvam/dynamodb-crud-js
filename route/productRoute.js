@@ -6,32 +6,32 @@ const app = require('express').Router();
 const TABLENAME = process.env.TABLENAME;
 
 
-//put new product
-app.post('/',async (req, res)=>{
-    const id = uuid.v4();
-    const params = {
-        TableName : `${TABLENAME}`,
-        Item: {
-            'PK' : `PRODUCT#${id}`,
-            'SK' : `PRODUCT`,
-            'name' : `${req.body.name}`,
-            'description' : `${req.body.description}`,
-            'price' : `${req.body.price}`,
-            'color' : `${req.body.color}`,
-            'id' : `${id}`
-        }
-    };
-    try{
-        const data = await dynamoDb.put(params).promise();
-        if(data)
-            res.send("Product created successfully");    
-    }catch (error) {
-        console.log(error);
-    }
-});
+// //put new product
+// app.post('/',async (req, res)=>{
+//     const id = uuid.v4();
+//     const params = {
+//         TableName : `${TABLENAME}`,
+//         Item: {
+//             'PK' : `PRODUCT#${id}`,
+//             'SK' : `PRODUCT`,
+//             'name' : `${req.body.name}`,
+//             'description' : `${req.body.description}`,
+//             'price' : `${req.body.price}`,
+//             'color' : `${req.body.color}`,
+//             'id' : `${id}`
+//         }
+//     };
+//     try{
+//         const data = await dynamoDb.put(params).promise();
+//         if(data)
+//             res.send("Product created successfully");    
+//     }catch (error) {
+//         console.log(error);
+//     }
+// });
 
 //put new product by update expression
-app.post('/new', async(req,res) => {
+app.post('/', async(req,res) => {
     const id = uuid.v4();
     const params = {
         TableName: TABLENAME,
@@ -39,13 +39,14 @@ app.post('/new', async(req,res) => {
             PK: `PRODUCT#${id}`,
             SK: `PRODUCT`
         },
-        UpdateExpression: "set #color = :color, #price = :price, #name = :name, #description = :description, #id = :id",
+        UpdateExpression: "set #color = :color, #price = :price, #name = :name, #description = :description, #id = :id, #invocation = invocation + 1",
         ExpressionAttributeNames:{
             "#color": "color",
             "#price": "price",
             "#name":"name",
             "#description": "description",
-            "#id": "id"
+            "#id": "id",
+            "#invocation" : "invocation"
         },
         ExpressionAttributeValues:{
             ':color' : `${req.body.color}`,
@@ -108,13 +109,14 @@ app.put('/:id',async(req, res)=>{
             PK: `PRODUCT#${req.params.id}`,
             SK: `PRODUCT`
         },
-        UpdateExpression: "set color = :color, price = :price, #name = :name, description = :description",
+        UpdateExpression: "set color = :color, price = :price, #name = :name, description = :description, invocation = invocation + :p",
         ExpressionAttributeNames:{"#name":"name"},
         ExpressionAttributeValues:{
             ':color' : `${req.body.color}`,
             ':price' : `${req.body.price}`,
             ':name' : `${req.body.name}`,
-            ':description' : `${req.body.description}`
+            ':description' : `${req.body.description}`,
+            ':p' : 1
         },
         ReturnValues : 'UPDATED_NEW'
     };
