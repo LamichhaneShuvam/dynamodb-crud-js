@@ -1,6 +1,5 @@
 const dynamoDb = require('../dynamoDb');
 const uuid = require('uuid');
-const { DynamoDBCustomizations } = require('aws-sdk/lib/services/dynamodb');
 require('dotenv').config();
 const app = require('express').Router();
 
