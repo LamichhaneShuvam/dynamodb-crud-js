@@ -30,6 +30,41 @@ app.post('/',async (req, res)=>{
     }
 });
 
+//put new product by update expression
+app.post('/new', async(req,res) => {
+    const id = uuid.v4();
+    const params = {
+        TableName: TABLENAME,
+        Key:{
+            PK: `PRODUCT#${id}`,
+            SK: `PRODUCT`
+        },
+        UpdateExpression: "set #color = :color, #price = :price, #name = :name, #description = :description, #id = :id",
+        ExpressionAttributeNames:{
+            "#color": "color",
+            "#price": "price",
+            "#name":"name",
+            "#description": "description",
+            "#id": "id"
+        },
+        ExpressionAttributeValues:{
+            ':color' : `${req.body.color}`,
+            ':price' : `${req.body.price}`,
+            ':name' : `${req.body.name}`,
+            ':description' : `${req.body.description}`,
+            ':id' : `${id}`
+        },
+        ReturnValues : 'UPDATED_NEW'
+    };
+    try {
+        const data = await dynamoDb.update(params).promise();
+        res.send(data.Attributes);
+    } catch (error) {
+        console.log(error);
+        res.send(error);
+    }
+});
+
 //get by product id
 app.get('/:id', async(req,res)=>{
     const params = {
