@@ -1,5 +1,5 @@
 const dynamoDb = require('../dynamoDb');
-const uuid = require('uuid');
+const {v4: uuid } = require('uuid');
 const app = require('express').Router();
 require('dotenv').config();
 
@@ -23,27 +23,60 @@ app.get('/:id', async(req,res)=>{
 });
 
 
-//put the user
-app.post('/',async (req, res)=>{
-    const id = uuid.v4();
+// //put the user
+// app.post('/',async (req, res)=>{
+//     const id = uuid.v4();
+//     const params = {
+//         TableName : `${TABLENAME}`,
+//         Item: {
+//             'PK' : `USER#${id}`,
+//             'SK' : `USER`,
+//             'name' : `${req.body.name}`,
+//             'email' : `${req.body.email}`,
+//             'phone' : `${req.body.phone}`,
+//             'id' : `${id}`
+//         },
+//         //ReturnValues: '' // any _NEW doesn't work...
+//     };
+//     try{
+//         const data = await dynamoDb.put(params).promise();
+//         if(data)
+//             res.send("user created successfully");    
+//     }catch (error) {
+//         console.log(error);
+//         res.send(error);
+//     }
+// });
+
+//same put user but update insted of put
+app.post('/',async(req,res)=>{
+    const id = uuid();
     const params = {
-        TableName : `${TABLENAME}`,
-        Item: {
-            'PK' : `USER#${id}`,
-            'SK' : `USER`,
-            'name' : `${req.body.name}`,
-            'email' : `${req.body.email}`,
-            'phone' : `${req.body.phone}`,
-            'id' : `${id}`
+        TableName: `${TABLENAME}`,
+        Key:{
+            PK: `USER#${id}`,
+            SK: `USER`
         },
-        //ReturnValues: '' // any _NEW doesn't work...
+        UpdateExpression:"set #name = :name, #phone = :phone, #email = :email, #id = :id",
+        ExpressionAttributeNames: {
+            "#name" : "name",
+            "#phone":"phone",
+            "#email":"email",
+            "#id": "id"
+        },
+        ExpressionAttributeValues: {
+            ':name' : `${req.body.name}`,
+            ':phone' : `${req.body.phone}`,
+            ':email' : `${req.body.email}`,
+            ':id' : `${id}`
+        }, ReturnValues: "UPDATED_NEW"
     };
-    try{
-        const data = await dynamoDb.put(params).promise();
-        if(data)
-            res.send("user created successfully");    
-    }catch (error) {
+    try {
+        const data = await dynamoDb.update(params).promise();
+        res.send(data.Attributes);
+    } catch (error) {
         console.log(error);
+        res.send(error);
     }
 });
 
