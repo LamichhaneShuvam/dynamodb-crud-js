@@ -4,7 +4,32 @@ require('dotenv').config();
 const app = require('express').Router();
 
 const TABLENAME = process.env.TABLENAME;
-
+//
+//batch get items gets one user and one product
+app.get('/batch', async (req,res)=>{
+    const params = {
+        RequestItems: {
+            'Store': {
+                Keys: [{
+                    PK: `USER#e408d9c2-2403-457a-b6d6-e8fa4611b092`,
+                    SK: `USER`
+                }]
+            },
+            'Store': {
+                Keys: [{
+                    PK: `PRODUCT#bfc8a904-43f2-4048-a632-e6ca173478ce`,
+                    SK: `PRODUCT`
+                }]
+            }
+        }
+    };
+    try {
+        const data = await dynamoDb.batchGet(params).promise();
+        res.send(data);
+    } catch (error) {
+        res.send(error);
+    }
+});
 
 //put new product and increase product stat counter
 app.post('/',async(req,res)=>{
